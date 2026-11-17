@@ -10,20 +10,20 @@ help:
 
 # ---------------------------------------------------------------- local dev
 .PHONY: init
-init: 
+init:
 	@test -f .env || (cp .env.example .env && echo "Created .env -- edit the passwords.")
 
 .PHONY: up
-up: init 
+up: init
 	$(COMPOSE) up -d --build
 	@echo "Open http://localhost"
 
 .PHONY: down
-down: 
+down:
 	$(COMPOSE) down
 
 .PHONY: destroy
-destroy: 
+destroy:
 	$(COMPOSE) down -v
 
 .PHONY: logs
@@ -31,11 +31,11 @@ logs:
 	$(COMPOSE) logs -f --tail=100
 
 .PHONY: ps
-ps: 
+ps:
 	$(COMPOSE) ps
 
 .PHONY: shell
-shell: 
+shell:
 	$(COMPOSE) exec app /bin/bash
 
 .PHONY: psql
@@ -43,7 +43,7 @@ psql:
 	$(COMPOSE) exec db psql -U $${POSTGRES_USER:-taskboard} -d $${POSTGRES_DB:-taskboard}
 
 .PHONY: monitoring
-monitoring: 
+monitoring:
 	$(COMPOSE) --profile monitoring up -d
 
 .PHONY: install
@@ -51,21 +51,21 @@ install:
 	pip install -r requirements-dev.txt
 
 .PHONY: test
-test: 
+test:
 	pytest -v --cov=app --cov-report=term-missing
 
 .PHONY: lint
-lint: 
+lint:
 	ruff check .
 	ruff format --check .
 
 .PHONY: fmt
-fmt: 
+fmt:
 	ruff format .
 	ruff check --fix .
 
 .PHONY: security
-security: 
+security:
 	bandit -r app -ll
 	@command -v trivy >/dev/null && trivy image taskboard:local || \
 	  echo "Trivy not installed -- see https://trivy.dev for install instructions"
@@ -75,29 +75,29 @@ freeze:
 	pip freeze > requirements.lock
 
 .PHONY: ci
-ci: lint test 
+ci: lint test
 
 # ------------------------------------------------------------------ release
 .PHONY: build
-build: 
+build:
 	docker build --build-arg APP_VERSION=$$(git rev-parse --short HEAD 2>/dev/null || echo dev) -t taskboard:local .
 
 .PHONY: deploy
-deploy: 
+deploy:
 	$(PROD) pull app
 	$(PROD) up -d --remove-orphans
 
 .PHONY: backup
-backup: 
+backup:
 	bash scripts/backup.sh
 
 .PHONY: restore
-restore: 
+restore:
 	bash scripts/restore.sh $(FILE)
 
 # ---------------------------------------------------------------- terraform
 .PHONY: tf-init tf-plan tf-apply tf-destroy
-tf-init: 
+tf-init:
 	cd terraform && terraform init
 tf-plan:
 	cd terraform && terraform fmt && terraform validate && terraform plan
