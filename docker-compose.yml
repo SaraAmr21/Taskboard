@@ -1,0 +1,93 @@
+# Local development stack.
+#   docker compose up -d --build                      app + database + nginx
+#   docker compose --profile monitoring up -d         adds Prometheus + Grafana
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: taskboard-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-taskboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taskboard}
+      POSTGRES_DB: ${POSTGRES_DB:-taskboard}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-taskboard} -d ${POSTGRES_DB:-taskboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [backend]
+
+  app:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    image: taskboard:local
+    container_name: taskboard-app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-taskboard}:${POSTGRES_PASSWORD:-taskboard}@db:5432/${POSTGRES_DB:-taskboard}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      APP_VERSION: ${APP_VERSION:-dev}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [backend, frontend]
+    expose:
+      - "8000"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: taskboard-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks: [frontend]
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: taskboard-prometheus
+    profiles: [monitoring]
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    ports:
+      - "9090:9090"
+    networks: [frontend]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: taskboard-grafana
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks: [frontend]
+
+volumes:
+  pgdata:
+  promdata:
+  grafanadata:
+
+networks:
+  frontend:
+  backend:

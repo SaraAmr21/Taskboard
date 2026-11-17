@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task Board</title>
+<style>
+  :root{
+    --paper:#eef2f6;
+    --card:#ffffff;
+    --ink:#16283b;
+    --ink-soft:#5a6e82;
+    --rule:#c6d6e4;
+    --todo:#3a6ea5;
+    --doing:#c07a1e;
+    --done:#2e7d57;
+    --danger:#a8433b;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+    line-height:1.5;
+    background-image:
+      linear-gradient(var(--rule) 1px, transparent 1px),
+      linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+    background-size:32px 32px;
+    background-position:-1px -1px;
+  }
+  body::before{content:"";position:fixed;inset:0;background:var(--paper);opacity:.82;z-index:-1}
+
+  /* Deploy identity bar — the first thing you see is what is running. */
+  .bar{
+    display:flex;flex-wrap:wrap;gap:1.25rem;align-items:baseline;
+    padding:.7rem 1.5rem;background:var(--ink);color:#dbe6f0;font-family:var(--mono);font-size:.78rem;
+  }
+  .bar strong{color:#fff;font-weight:600;letter-spacing:.01em}
+  .bar span{color:#9db3c8}
+  .bar .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#4ade80;margin-right:.4rem}
+  .bar .dot.bad{background:#f87171}
+
+  main{max-width:1080px;margin:0 auto;padding:2rem 1.5rem 4rem}
+  h1{font-size:1.6rem;font-weight:650;margin:.5rem 0 .25rem;letter-spacing:-.01em}
+  .lede{color:var(--ink-soft);margin:0 0 2rem;max-width:56ch}
+
+  .layout{display:grid;grid-template-columns:300px 1fr;gap:2rem;align-items:start}
+  @media (max-width:760px){.layout{grid-template-columns:1fr}}
+
+  .panel{background:var(--card);border:1px solid var(--rule);padding:1.1rem}
+  .panel h2{font-size:.9rem;font-weight:650;margin:0 0 .9rem}
+
+  label{display:block;font-size:.82rem;color:var(--ink-soft);margin:.7rem 0 .25rem}
+  input,textarea,select,button{font:inherit;color:inherit}
+  input,textarea,select{
+    width:100%;padding:.5rem .6rem;border:1px solid var(--rule);background:#fbfdff;border-radius:2px;
+  }
+  textarea{resize:vertical;min-height:64px}
+  input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible{
+    outline:2px solid var(--todo);outline-offset:1px
+  }
+  .add{
+    margin-top:1rem;width:100%;padding:.6rem;background:var(--ink);color:#fff;border:0;border-radius:2px;
+    cursor:pointer;font-weight:550;
+  }
+  .add:hover{background:#21394f}
+
+  /* Ledger of counts — mono numerals, aligned like a readout, not a stat card. */
+  .ledger{list-style:none;margin:0;padding:0;font-family:var(--mono);font-size:.85rem}
+  .ledger li{display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px dotted var(--rule)}
+  .ledger li:last-child{border-bottom:0;font-weight:700}
+
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+  @media (max-width:640px){.board{grid-template-columns:1fr}}
+  .col h2{display:flex;justify-content:space-between;align-items:baseline;font-size:.88rem;margin:0 0 .6rem;
+    padding-bottom:.4rem;border-bottom:2px solid var(--rule)}
+  .col[data-s="todo"] h2{border-color:var(--todo)}
+  .col[data-s="doing"] h2{border-color:var(--doing)}
+  .col[data-s="done"] h2{border-color:var(--done)}
+  .col h2 em{font-style:normal;font-family:var(--mono);font-size:.78rem;color:var(--ink-soft)}
+
+  .task{background:var(--card);border:1px solid var(--rule);border-left:3px solid var(--todo);
+    padding:.65rem .75rem;margin-bottom:.6rem}
+  .task[data-s="doing"]{border-left-color:var(--doing)}
+  .task[data-s="done"]{border-left-color:var(--done)}
+  .task[data-s="done"] .title{color:var(--ink-soft);text-decoration:line-through}
+  .task .id{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft)}
+  .task .title{font-weight:550;margin:.1rem 0 .2rem;word-break:break-word}
+  .task .detail{font-size:.85rem;color:var(--ink-soft);margin:0 0 .5rem;word-break:break-word}
+  .actions{display:flex;gap:.4rem;flex-wrap:wrap}
+  .actions button{
+    background:transparent;border:1px solid var(--rule);border-radius:2px;padding:.2rem .5rem;
+    font-size:.76rem;cursor:pointer;color:var(--ink-soft)
+  }
+  .actions button:hover{border-color:var(--ink);color:var(--ink)}
+  .actions button.del:hover{border-color:var(--danger);color:var(--danger)}
+
+  .empty{font-size:.84rem;color:var(--ink-soft);border:1px dashed var(--rule);padding:.8rem;background:#fbfdff}
+  .error{margin-bottom:1rem;padding:.6rem .75rem;border:1px solid var(--danger);color:var(--danger);
+    background:#fdf4f3;font-size:.86rem}
+  [hidden]{display:none !important}
+  footer{margin-top:2.5rem;font-family:var(--mono);font-size:.75rem;color:var(--ink-soft)}
+  footer a{color:var(--todo)}
+</style>
+</head>
+<body>
+
+<div class="bar" id="bar">
+  <strong id="b-app">Task Board</strong>
+  <span><span class="dot" id="b-dot"></span><span id="b-health">checking…</span></span>
+  <span>env <b id="b-env">—</b></span>
+  <span>build <b id="b-ver">—</b></span>
+  <span id="b-host">—</span>
+</div>
+
+<main>
+  <h1>Task board</h1>
+  <p class="lede">A deliberately small service with a real database behind it. Everything you add here
+     survives a container restart, because the data lives in a volume rather than in the container.</p>
+
+  <div class="error" id="err" hidden></div>
+
+  <div class="layout">
+    <div>
+      <section class="panel">
+        <h2>Add a task</h2>
+        <form id="form">
+          <label for="title">Title</label>
+          <input id="title" name="title" maxlength="200" required placeholder="Rotate the TLS certificate">
+          <label for="detail">Notes</label>
+          <textarea id="detail" name="detail" maxlength="2000" placeholder="Optional"></textarea>
+          <label for="status">Column</label>
+          <select id="status" name="status">
+            <option value="todo">To do</option>
+            <option value="doing">In progress</option>
+            <option value="done">Done</option>
+          </select>
+          <button class="add" type="submit">Add task</button>
+        </form>
+      </section>
+
+      <section class="panel" style="margin-top:1rem">
+        <h2>Counts</h2>
+        <ul class="ledger" id="ledger">
+          <li><span>To do</span><span id="c-todo">0</span></li>
+          <li><span>In progress</span><span id="c-doing">0</span></li>
+          <li><span>Done</span><span id="c-done">0</span></li>
+          <li><span>Total</span><span id="c-total">0</span></li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="board">
+      <div class="col" data-s="todo"><h2>To do <em id="n-todo">0</em></h2><div id="list-todo"></div></div>
+      <div class="col" data-s="doing"><h2>In progress <em id="n-doing">0</em></h2><div id="list-doing"></div></div>
+      <div class="col" data-s="done"><h2>Done <em id="n-done">0</em></h2><div id="list-done"></div></div>
+    </div>
+  </div>
+
+  <footer>
+    <a href="/docs">API docs</a> · <a href="/healthz">/healthz</a> · <a href="/readyz">/readyz</a> · <a href="/metrics">/metrics</a>
+  </footer>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const COLUMNS = ["todo", "doing", "done"];
+const LABEL = { todo: "To do", doing: "In progress", done: "Done" };
+
+function showError(message) {
+  const box = $("err");
+  box.textContent = message;
+  box.hidden = false;
+}
+function clearError() { $("err").hidden = true; }
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (!res.ok) throw new Error(`${options.method || "GET"} ${path} returned ${res.status}`);
+  return res.status === 204 ? null : res.json();
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+function taskNode(task) {
+  const el = document.createElement("article");
+  el.className = "task";
+  el.dataset.s = task.status;
+  const moves = COLUMNS.filter((s) => s !== task.status)
+    .map((s) => `<button data-move="${s}" data-id="${task.id}">Move to ${LABEL[s].toLowerCase()}</button>`)
+    .join("");
+  el.innerHTML = `
+    <div class="id">#${task.id}</div>
+    <div class="title">${escapeHtml(task.title)}</div>
+    ${task.detail ? `<p class="detail">${escapeHtml(task.detail)}</p>` : ""}
+    <div class="actions">${moves}<button class="del" data-del="${task.id}">Delete</button></div>`;
+  return el;
+}
+
+async function refresh() {
+  try {
+    const tasks = await api("/api/tasks");
+    clearError();
+    for (const status of COLUMNS) {
+      const list = $(`list-${status}`);
+      const subset = tasks.filter((t) => t.status === status);
+      list.replaceChildren();
+      if (!subset.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty";
+        empty.textContent = status === "todo" ? "Nothing queued. Add a task to begin." : "Nothing here yet.";
+        list.append(empty);
+      } else {
+        subset.forEach((t) => list.append(taskNode(t)));
+      }
+      $(`n-${status}`).textContent = subset.length;
+      $(`c-${status}`).textContent = subset.length;
+    }
+    $("c-total").textContent = tasks.length;
+  } catch (e) {
+    showError(`Could not load tasks. ${e.message}`);
+  }
+}
+
+$("form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = {
+    title: $("title").value.trim(),
+    detail: $("detail").value.trim(),
+    status: $("status").value,
+  };
+  if (!payload.title) return;
+  try {
+    await api("/api/tasks", { method: "POST", body: JSON.stringify(payload) });
+    $("title").value = ""; $("detail").value = "";
+    $("title").focus();
+    await refresh();
+  } catch (e) {
+    showError(`Could not save the task. ${e.message}`);
+  }
+});
+
+document.addEventListener("click", async (event) => {
+  const moveTo = event.target.dataset?.move;
+  const deleteId = event.target.dataset?.del;
+  try {
+    if (moveTo) {
+      await api(`/api/tasks/${event.target.dataset.id}`, {
+        method: "PATCH", body: JSON.stringify({ status: moveTo }),
+      });
+      await refresh();
+    } else if (deleteId) {
+      await api(`/api/tasks/${deleteId}`, { method: "DELETE" });
+      await refresh();
+    }
+  } catch (e) {
+    showError(`That action did not go through. ${e.message}`);
+  }
+});
+
+async function health() {
+  try {
+    const h = await api("/healthz");
+    $("b-app").textContent = "Task Board";
+    $("b-health").textContent = "healthy";
+    $("b-env").textContent = h.environment;
+    $("b-ver").textContent = h.version;
+    $("b-host").textContent = location.host;
+  } catch {
+    $("b-dot").classList.add("bad");
+    $("b-health").textContent = "unreachable";
+  }
+}
+
+health();
+refresh();
+setInterval(refresh, 15000);
+</script>
+</body>
+</html>
