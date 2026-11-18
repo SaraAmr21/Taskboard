@@ -28,3 +28,33 @@ jobs:
 
       - name: Bandit security scan
         run: bandit -r app -ll
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: taskboard
+          POSTGRES_PASSWORD: taskboard
+          POSTGRES_DB: taskboard_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U taskboard"
+          --health-interval 10s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://taskboard:taskboard@localhost:5432/taskboard_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -v --cov=app --cov-report=term-missing
