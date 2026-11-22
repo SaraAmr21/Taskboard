@@ -1,0 +1,18 @@
+services:
+  db:
+    restart: always
+
+  app:
+    build: !reset null
+    image: ${IMAGE:?set IMAGE in .env}
+    restart: always
+    environment:
+      ENVIRONMENT: production
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  nginx:
+    restart: always
